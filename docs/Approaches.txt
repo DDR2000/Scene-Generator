@@ -1,0 +1,6 @@
+Dilir
+-------------
+1. Training data is fed as layout plans pulled from the web.
+2. Using GANs to train the model without requiring manual input.
+Additional problems with training discriminator network.
+3. 
