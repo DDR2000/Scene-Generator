@@ -78,8 +78,8 @@ for i, prompt in enumerate(prompts):
     object_names = yolo_results_df["name"].tolist()
 
     # Move inference output to specified output folder
-    timestamp = os.listdir('../runs/detect/exp/')[0]
-    shutil.move(os.path.join('../runs/detect/exp', timestamp), os.path.join(set_directory, timestamp))
+    timestamp = os.listdir('../runs/detect/')[0]
+    shutil.move(os.path.join('../runs/detect', timestamp), os.path.join(set_directory, timestamp))
 
     # Load the generated image for MiDaS
     filename = f"{set_directory}/image.png"
