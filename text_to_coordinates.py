@@ -80,7 +80,7 @@ for i, prompt in enumerate(prompts):
     # Move inference output to specified output folder
     timestamp = os.listdir('./runs/detect/')[0]
     shutil.move(os.path.join('./runs/detect', timestamp), os.path.join(set_directory, timestamp))
-
+    # ll
     # Load the generated image for MiDaS
     filename = f"{set_directory}/image.png"
     img = cv2.imread(filename)
