@@ -1,13 +1,22 @@
 import os
 import torch
 import cv2
-import urllib.request
 import matplotlib.image
 from diffusers import StableDiffusionXLPipeline
-import shutil
 import json
-import numpy as np
+from ultralytics import YOLO
+import sys
 
+# return list[name, x, y, z]
+
+def read_prompts(filename):
+    try:
+        with open(filename, 'r') as file:
+            prompt_text = file.read()
+            print("Prompt read successfully:")
+            print(prompt_text)
+    except FileNotFoundError:
+        print(f"Error: File '{filename}' not found.")
 
 # Function to create a directory if it doesn't exist
 def create_directory(directory):
@@ -26,9 +35,6 @@ pipe = StableDiffusionXLPipeline.from_pretrained(
 )
 pipe = pipe.to("cuda")
 
-# Load YOLO model
-model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
-
 # Load MiDaS model
 model_type = "DPT_Large"  # Change to your desired MiDaS model
 midas = torch.hub.load("intel-isl/MiDaS", model_type)
@@ -37,24 +43,50 @@ midas.to(device)
 midas.eval()
 midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
 
-# Read prompts from a file
-prompt_file = "prompts3.txt"  # Replace with the path to your prompt file
-with open(prompt_file, "r") as file:
-    prompts = file.read().splitlines()
+if len(sys.argv) != 2:
+    print("Usage: python script.py prompts.txt")
+else:
+    prompt_file = sys.argv[1]
+    read_prompts(prompt_file)
+
+    # Read prompts from a file
+    with open(prompt_file, "r") as file:
+        prompts = file.read().splitlines()
 
 
 # Function to extract depth within bounding boxes
-def extract_depth_within_boxes(depth_map, boxes):
+def extract_depth_within_boxes(depth_map, objects_info):
     depths = []
-    for box in boxes:
-        xmin, ymin, xmax, ymax = map(int, box)  # Convert to integers
+    for obj_idx, obj in objects_info.items():
+        print(f"processing object {obj_idx}")
+        xmin, ymin, xmax, ymax = map(int, obj["box"])  # Convert to integers
         box_depth = depth_map[ymin:ymax, xmin:xmax].mean()
         depths.append(box_depth)
     return depths
 
 
-# Create a list to store all detected objects
-detected_objects = []
+def run_yolo(set_directory):
+    # Detect objects and bounding boxes using YOLO
+    # Load YOLOv8 model
+    model = YOLO("yolov8n.pt")
+    img = [f"{set_directory}/image.png"]
+    results = model(img)
+    # Save YOLOv8 detection results as images
+    boxes = results[0].boxes  # Boxes object for bounding box outputs
+    # masks = results[0].masks  # Masks object for segmentation masks outputs
+    # keypoints = results[0].keypoints  # Keypoints object for pose outputs
+    # probs = results[0].probs  # Probs object for classification outputs
+    # results[0].show()  # display to screen
+    results[0].save(filename=f"{set_directory}/result.jpg")
+
+    objects_info = {}
+    obj_cnt = 0
+    for box in boxes:
+        objects_info[str(obj_cnt)] = {"class": model.names[int(box.cls)], "box": box.xyxy.cpu().numpy()[0].tolist()}
+        obj_cnt += 1
+
+    return objects_info
+
 
 # Process each set of prompts
 for i, prompt in enumerate(prompts):
@@ -63,25 +95,9 @@ for i, prompt in enumerate(prompts):
     create_directory(set_directory)
 
     # Generate an image using Stable Diffusion XL
-    image = pipe(prompt + " canon50, focal length 50mm, sensor size 35 mm").images[0]
+    image = pipe(prompt).images[0]
     image.save(f"{set_directory}/image.png")
 
-    # Detect objects and bounding boxes using YOLO
-    imgs = [f"{set_directory}/image.png"]
-    results = model(imgs)
-    results.save()
-
-    # Load YOLO results into a pandas DataFrame
-    yolo_results_df = results.pandas().xyxy[0]
-
-    # Extract object names and store them in a list
-    object_names = yolo_results_df["name"].tolist()
-
-    # Move inference output to specified output folder
-    timestamp = os.listdir('./runs/detect/')[0]
-    shutil.move(os.path.join('./runs/detect', timestamp), os.path.join(set_directory, timestamp))
-    # ll
-    # Load the generated image for MiDaS
     filename = f"{set_directory}/image.png"
     img = cv2.imread(filename)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -105,11 +121,13 @@ for i, prompt in enumerate(prompts):
     # Save the depth map
     matplotlib.image.imsave(f"{set_directory}/depth.png", output)
 
-    # Extract the bounding boxes from YOLO results
-    boxes = yolo_results_df[["xmin", "ymin", "xmax", "ymax"]].values
+    # Run yolo
+    objects_info = run_yolo(set_directory)
+
+    print(objects_info)
 
     # Calculate the mean depth for each bounding box
-    depths = extract_depth_within_boxes(output, boxes)
+    depths = extract_depth_within_boxes(output, objects_info)
 
     # Create a list to store the coordinates of detected objects in 3D space
     object_coordinates_3d = []
@@ -118,9 +136,9 @@ for i, prompt in enumerate(prompts):
     virtual_space_size = (1024, 1024, 1024)
 
     # Loop through detected objects and convert their coordinates
-    for j, box in enumerate(boxes):
-        xmin, ymin, xmax, ymax = box
-        box_depth = depths[j]
+    for obj_idx, obj in objects_info.items():
+        xmin, ymin, xmax, ymax = map(int, obj["box"])
+        box_depth = depths[int(obj_idx)]
 
         # Calculate the x and y coordinates based on the bounding box
         x = (xmin + xmax) / 2
@@ -131,11 +149,14 @@ for i, prompt in enumerate(prompts):
 
         # Append the object's 3D coordinates to the list
         object_coordinates_3d.append({
-            "name": object_names[j],
+            "name": objects_info[obj_idx]["class"],
             "x": x,
             "y": y,
             "z": z
         })
+
+    print("object_coordinates_3d")
+    print(object_coordinates_3d)
 
     # Save the object coordinates in 3D space as a JSON file
     json_file_path = os.path.join(set_directory, "object_coordinates_3d.json")

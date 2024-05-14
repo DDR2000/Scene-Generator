@@ -1,5 +1,7 @@
+
 import gensim.downloader
 import objaverse
+
 
 def getpath(nested_dict, value, prepath=()):
     for k, v in nested_dict.items():
@@ -10,6 +12,7 @@ def getpath(nested_dict, value, prepath=()):
             p = getpath(v, value, path) # recursive call
             if p is not None:
                 return p
+
 
 print(list(gensim.downloader.info()['models'].keys()))
 glove_vectors = gensim.downloader.load('word2vec-google-news-300')

@@ -1,0 +1,16 @@
+1. [Subject & Type of Image],
+Portrait, Landscape, Motion Blur, Macro, Street, Architectural
+2. [Details & Shot Type],
+Full Shot, Medium Shot, Close-Up, Extreme Close-Up
+3. [Environment & Camera Angles],
+Low Angle, High Angle, Normal Angle
+4. [Mood & Lighting Conditions],
+golden hour, midday contrast, nighttime ambiance
+5. [Equipment],
+    Camera Type: Camera selection (e.g., Mirrorless, DSLR, Full Frame).
+    Camera Lens: Specific lens choice or focal length range.
+    Camera Eye Line: Position relative to the subject's eyes (e.g., Normal, Low, High).
+6. [Exposure & Style]
+    Aperture (f-stop): Desired lens opening size (e.g., f/1.8, f/16).
+    Shutter Speed: Preferred exposure duration (e.g., 1/1000 sec, 1/30 sec).
+    ISO: Sensor sensitivity setting (e.g., 100, 3200).
