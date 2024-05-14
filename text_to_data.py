@@ -440,17 +440,17 @@ for i, prompt in enumerate(prompts):
     #reimagine(filename)
     #torch.cuda.empty_cache()
     # Generate control net conditioning image
-    conditioning_prompt = "ultra realistic backyard furniture"
-    control_net_conditioning(filename, conditioning_prompt)
+    #conditioning_prompt = "student doing homework on computer"
+    #control_net_conditioning(filename, conditioning_prompt)
 
-    # Semantic guidance image generatio
-    simple_prompt = "backyard"
-    semantic_prompt = ["journal table, coffee table, desk",
-                       "sofa, couch, sectional",
-                       "flower pot, exotic plant",
-                       "TV, flat display, cinema projector"]
+    # Semantic guidance image generation using SD_V1.5 + Upscaler
+    #simple_prompt = "office"
+    #semantic_prompt = ["desk",
+    #                   "chair",
+    #                   "computer",
+    #                   "flower pot"]
 
-    semantic_guidance(simple_prompt, semantic_prompt)
+    #semantic_guidance(simple_prompt, semantic_prompt)
 
     # Find object orientation, find orientation of extracted objects
     #predominant_orientation = run_hough_transform(filename)

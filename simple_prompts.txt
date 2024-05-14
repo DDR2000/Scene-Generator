@@ -1,1 +1,4 @@
-backyard
+office
+office room
+office room and desk
+office room, desk and chair
