@@ -1,0 +1,17 @@
+#usda 1.0
+(
+    customLayerData = {
+        string[] filenames = ["cow.obj"]
+        bool hasAdobeProperties = 0
+    }
+    defaultPrim = "cow"
+    doc = """Generated from Composed Stage of root layer /home/ubuntu/Scene-Generator/test/cow.obj
+"""
+)
+
+def Xform "cow"
+{
+    double3 xformOp:translate:pos = (1, 1, 1)
+    uniform token[] xformOpOrder = ["xformOp:translate:pos"]
+}
+
