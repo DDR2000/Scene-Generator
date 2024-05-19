@@ -1,14 +1,10 @@
-from pxr import Usd, UsdGeom, Sdf
+from pxr import Sdf, Usd
+import os
 
+obj_file_path = "./bunny/data/bun045.ply"
+usd_file_path = "bunny.usd"
 print(Sdf.FileFormat.FindAllFileFormatExtensions())
-stage = Usd.Stage.Open("cow.obj")
-stage.Save()
+stage = Usd.Stage.Open(obj_file_path)
+stage.Export(usd_file_path)
 
-geom = stage.GetPrimAtPath("/cow")
-geom.GetReferences().AddReference('./cow.usd')
-
-geom = UsdGeom.Xform.Get(stage, '/cow')
-geom.AddTranslateOp(opSuffix='pos').Set((1.0,1.0,1.0))
-
-stage.Save()
-stage.Export("scene.usda")
+# os.system("usdrecord horse.usda horse.jpg")

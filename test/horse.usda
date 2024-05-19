@@ -1,0 +1,15 @@
+#usda 1.0
+(
+    customLayerData = {
+        string[] filenames = ["horse.obj"]
+        bool hasAdobeProperties = 0
+    }
+    defaultPrim = "horse"
+    doc = """Generated from Composed Stage of root layer /home/jafar/Scene-Generator/test/horse.obj
+"""
+)
+
+def Xform "horse"
+{
+}
+
