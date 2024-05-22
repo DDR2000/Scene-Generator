@@ -1,12 +1,9 @@
-import torch
 import os
 import cv2
 import json
-from torchvision.models.detection import maskrcnn_resnet50_fpn
-from torchvision.transforms import functional as F
-from PIL import Image
-import matplotlib.pyplot as plt
+from ultralytics import YOLO
 import numpy as np
+from PIL import Image
 
 
 def create_directory(directory):
@@ -25,95 +22,31 @@ def extract_depth_within_boxes(depth_map, objects_info):
     return depths
 
 
-# Load the pre-trained Mask R-CNN model
-maskrcnn_model = maskrcnn_resnet50_fpn(pretrained=True)
+model = YOLO("yolov8n.pt")
 
-# Set the model to evaluation mode
-maskrcnn_model.eval()
+def run_yolo(image_path):
+    # Detect objects and bounding boxes using YOLO
+    # Load YOLOv8 model
 
-# Define the labels for COCO dataset
-COCO_INSTANCE_CATEGORY_NAMES = [
-        '__background__', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
-        'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'N/A', 'stop sign',
-        'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
-        'elephant', 'bear', 'zebra', 'giraffe', 'N/A', 'backpack', 'umbrella', 'N/A', 'N/A',
-        'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
-        'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
-        'bottle', 'N/A', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
-        'banana', 'apple', 'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza',
-        'donut', 'cake', 'chair', 'couch', 'potted plant', 'bed', 'N/A', 'dining table',
-        'N/A', 'N/A', 'toilet', 'N/A', 'tv', 'laptop', 'mouse', 'remote', 'keyboard',
-        'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'N/A',
-        'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
-    ]
+    img = [image_path]
+    results = model(img)
+    # Save YOLOv8 detection results as images
+    boxes = results[0].boxes  # Boxes object for bounding box outputs
+    # masks = results[0].masks  # Masks object for segmentation masks outputs
+    # keypoints = results[0].keypoints  # Keypoints object for pose outputs
+    # probs = results[0].probs  # Probs object for classification outputs
+    # results[0].show()  # display to screen
+
+    # Make directory to save yolo results
 
 
-def run_maskrcnn(image_path, save_path, threshold=0.5):
-    # Load image
-    img = Image.open(image_path)
-    # Resize image to 1024x1024
-    img = img.resize((1024, 1024))
+    objects_info = {}
+    obj_cnt = 0
+    for box in boxes:
+        objects_info[str(obj_cnt)] = {"class": model.names[int(box.cls)], "box": box.xyxy.cpu().numpy()[0].tolist()}
+        obj_cnt += 1
 
-    img_tensor = F.to_tensor(img).unsqueeze(0)
-
-    # Predict
-    with torch.no_grad():
-        prediction = maskrcnn_model(img_tensor)
-
-    # Filter out detections below threshold
-    boxes = prediction[0]['boxes'][prediction[0]['scores'] > threshold]
-    labels = prediction[0]['labels'][prediction[0]['scores'] > threshold]
-    masks = prediction[0]['masks'][prediction[0]['scores'] > threshold]
-
-    # Convert PyTorch tensors to NumPy arrays
-    boxes_c = boxes.cpu().numpy()
-    labels_c = labels.cpu().numpy()
-    # masks_c = masks.cpu().numpy()
-
-    # Organize detection information in a dictionary
-    maskrcnn_objects_info = {}
-    for i, box in enumerate(boxes_c):
-        obj_info = {
-            "class": COCO_INSTANCE_CATEGORY_NAMES[labels_c[i]],
-            "box": box.tolist()
-        }
-        maskrcnn_objects_info[str(i)] = obj_info
-
-    # Visualize
-    plt.figure(figsize=(10.24, 10.24))  # Set figure size directly
-
-    plt.imshow(img)
-
-    ax = plt.gca()
-    for box, label, mask in zip(boxes, labels, masks):
-        x1, y1, x2, y2 = box
-        # Scale bounding box coordinates to match the resized image
-        x1_scaled = x1 * 1024 / img.width
-        x2_scaled = x2 * 1024 / img.width
-        y1_scaled = y1 * 1024 / img.height
-        y2_scaled = y2 * 1024 / img.height
-
-        category = COCO_INSTANCE_CATEGORY_NAMES[label.item()]
-        ax.add_patch(plt.Rectangle((x1_scaled, y1_scaled), x2_scaled - x1_scaled, y2_scaled - y1_scaled,
-                                   fill=False, edgecolor='red', linewidth=2))
-        plt.text(x1_scaled, y1_scaled, f'{category}', bbox=dict(facecolor='red', alpha=0.5),
-                 fontsize=12, color='white')
-        mask = mask[0].mul(255).byte().cpu().numpy()
-        mask_resized = cv2.resize(mask, (img.width, img.height))
-        img_np = np.array(img)
-        img_np[mask_resized == 255] = (img_np[mask_resized == 255] * 0.5) + (np.array([255, 0, 0]) * 0.5)
-
-    plt.axis('off')
-
-    # Remove white frame
-    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
-
-    # Save figure with appropriate size
-    plt.savefig(save_path, dpi=100, bbox_inches='tight', pad_inches=0)
-
-    plt.close()  # Close the figure to release resources
-
-    return maskrcnn_objects_info
+    return results, objects_info
 
 
 # add {i}.png
@@ -124,10 +57,9 @@ filenames = [
     "presentation/photo_sdxl/reimagine/photo_reimagine_image",
     "presentation/sdxl/canny_conditioning/canny_conditioning_image",
     "presentation/photo_sdxl/canny_conditioning/canny_conditioning_image",
-    "presentation/semantic_sd15/upscaled/upscaled_semantic_sd15_image"
+    "presentation/semantic_sd15/upscaled/upscaled_semantic_sd15_image",
+    "presentation/semantic_sd15/control_net/cnet_generated_image"
            ]
-
-
 for file in filenames:
     # Find the index of the last occurrence of '/'
     last_slash_index = file.rfind('/')
@@ -135,28 +67,24 @@ for file in filenames:
     # If '/' is found, remove everything after it (including '/')
     if last_slash_index != -1:
         directory_path = file[:last_slash_index]
-        maskrcnn_path = f"{directory_path}/maskrcnn"
-        create_directory(maskrcnn_path)
+        yolo_path = f"{directory_path}/yolo"
+        create_directory(yolo_path)
     else:
         # Dump in temp
         print("wrong paths provided")
         create_directory("presentation/temp")
-        maskrcnn_path = "presentation/temp"
-        directory_path = maskrcnn_path
+        yolo_path = "presentation/temp"
+        directory_path = yolo_path
 
     for i in range(9):
         if "cnet_generated_image" in file:
             for cond in ["Boy", "Girl", "Man", "Women"]:
                 filename = f"{file}_{i}_{cond}.png"
-                save_path = f"{maskrcnn_path}/maskrcnn_image_{i}_{cond}.png"
-                # Run Mask R-CNN
-                objects_info = run_maskrcnn(filename, save_path, threshold=0.5)
-                print("maskrcnn_objects_info")
-                print(objects_info)
+                results, objects_info = run_yolo(filename)
+                results[0].save(filename=f"{yolo_path}/yolo_image_{i}_{cond}.jpg")
+
                 # Load depth map image into numpy array.
                 depth_map_image_path = f"{directory_path}/depth_map/depth_image_{i}_{cond}.png"
-
-                # Open the image
                 image = Image.open(depth_map_image_path)
 
                 # Upscale the image to 1024x1024
@@ -208,7 +136,7 @@ for file in filenames:
                 print(object_coordinates_3d)
 
                 # Save the object coordinates in 3D space as a JSON file
-                json_file_path = f"{maskrcnn_path}/object_coordinates_3d_{i}_{cond}.json"
+                json_file_path = f"{yolo_path}/object_coordinates_3d_{i}_{cond}.json"
                 with open(json_file_path, "w") as json_file:
                     json.dump(object_coordinates_3d, json_file, indent=4)
 
@@ -216,11 +144,10 @@ for file in filenames:
 
         else:
             filename = f"{file}_{i}.png"
-            save_path = f"{maskrcnn_path}/maskrcnn_image_{i}.png"
-            # Run Mask R-CNN
-            objects_info = run_maskrcnn(filename, save_path, threshold=0.5)
-            print("maskrcnn_objects_info")
-            print(objects_info)
+
+            results, objects_info = run_yolo(filename)
+            results[0].save(filename=f"{yolo_path}/yolo_image_{i}.jpg")
+
             # Load depth map image into numpy array.
             depth_map_image_path = f"{directory_path}/depth_map/depth_image_{i}.png"
 
@@ -277,10 +204,12 @@ for file in filenames:
             print(object_coordinates_3d)
 
             # Save the object coordinates in 3D space as a JSON file
-            json_file_path = f"{maskrcnn_path}/object_coordinates_3d_{i}.json"
+            json_file_path = f"{yolo_path}/object_coordinates_3d_{i}.json"
             with open(json_file_path, "w") as json_file:
                 json.dump(object_coordinates_3d, json_file, indent=4)
 
             print(f"Processed results for set {i} in {directory_path}")
 
-    print("Processing completed.")
+print("Processing completed.")
+
+

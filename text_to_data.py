@@ -41,8 +41,8 @@ create_directory(results_directory)
 
 # Load Stable Diffusion XL
 pipe = StableDiffusionXLPipeline.from_pretrained(
-    "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16
-)
+    "stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16)
+
 pipe = pipe.to("cuda")
 
 # Load MiDaS model

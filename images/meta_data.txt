@@ -1,0 +1,88 @@
+SDXL - simple prompt
+Photo SDXL - simple prompt + photo specs prompt
+
+
+OFFICE
+Canny_conditioning:
+negative_prompt = 'low quality, bad quality, sketches'
+conditioning_prompt = 'student doing homework, cat sitting on the desk'
+
+Semantic guidance:
+semantic_prompt = ["desk",
+                   "chair",
+                   "computer",
+                   "flower pot"]
+
+Control_net generator:
+prompt = ", best quality, extremely detailed"
+negative_prompt=["monochrome, lowres, bad anatomy, worst quality, low quality"]
+4 variations = ["Boy", "Girl", "Man", "Women"]
+
+
+LIVING_ROOM
+Canny_conditioning:
+conditioning_prompt = "child watching tv on the sofa"
+
+Semantic guidance:
+semantic_prompt = ["journal desk",
+                   "chair",
+                   "computer",
+                   "flower pot"]
+
+
+BACKYARD
+Canny_conditioning:
+conditioning_prompt = "kids playing on the backyard"
+
+Semantic guidance:
+semantic_prompt = ["garage",
+                   "garden",
+                   "ball",
+                   "fire pit"]
+
+
+
+KITCHEN
+Canny_conditioning:
+conditioning_prompt = "cooking stake"
+
+Semantic guidance:
+semantic_prompt = ["dining room",
+                   "family dinner",
+                   "birthday party",
+                   "futuristic"]
+
+
+
+NATURE
+Canny_conditioning:
+conditioning_prompt = "cooking stake"
+
+Semantic guidance:
+semantic_prompt = ["landscape",
+                   "farm",
+                   "bear",
+                   "ocean"]
+
+
+
+CULTURAL
+Canny_conditioning:
+conditioning_prompt = "4th of july parade"
+
+Semantic guidance:
+semantic_prompt = ["4th of july",
+                   "president",
+                   "happy people",
+                   "sweet treats"]
+
+
+HOLIDAY
+Canny_conditioning:
+conditioning_prompt = "thanksgiving family dinner"
+
+Semantic guidance:
+semantic_prompt = ["family home",
+                   "dogs sleeping",
+                   "birthday",
+                   "party"]

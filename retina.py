@@ -2,7 +2,7 @@ import torch
 import os
 import cv2
 import json
-from torchvision.models.detection import maskrcnn_resnet50_fpn
+from torchvision.models.detection import retinanet
 from torchvision.transforms import functional as F
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -25,11 +25,12 @@ def extract_depth_within_boxes(depth_map, objects_info):
     return depths
 
 
-# Load the pre-trained Mask R-CNN model
-maskrcnn_model = maskrcnn_resnet50_fpn(pretrained=True)
+# Load RetinaNet model
+# Load the pre-trained RetinaNet model
+retina_net_model = retinanet.retinanet_resnet50_fpn(pretrained=True)
 
 # Set the model to evaluation mode
-maskrcnn_model.eval()
+retina_net_model.eval()
 
 # Define the labels for COCO dataset
 COCO_INSTANCE_CATEGORY_NAMES = [
@@ -48,7 +49,7 @@ COCO_INSTANCE_CATEGORY_NAMES = [
     ]
 
 
-def run_maskrcnn(image_path, save_path, threshold=0.5):
+def run_retina_net(image_path, save_path, threshold=0.5):
     # Load image
     img = Image.open(image_path)
     # Resize image to 1024x1024
@@ -58,34 +59,35 @@ def run_maskrcnn(image_path, save_path, threshold=0.5):
 
     # Predict
     with torch.no_grad():
-        prediction = maskrcnn_model(img_tensor)
+        prediction = retina_net_model(img_tensor)
 
     # Filter out detections below threshold
     boxes = prediction[0]['boxes'][prediction[0]['scores'] > threshold]
     labels = prediction[0]['labels'][prediction[0]['scores'] > threshold]
-    masks = prediction[0]['masks'][prediction[0]['scores'] > threshold]
+    scores = prediction[0]['scores'][prediction[0]['scores'] > threshold]
 
     # Convert PyTorch tensors to NumPy arrays
     boxes_c = boxes.cpu().numpy()
     labels_c = labels.cpu().numpy()
-    # masks_c = masks.cpu().numpy()
+    scores_c = scores.cpu().numpy()
 
     # Organize detection information in a dictionary
-    maskrcnn_objects_info = {}
-    for i, box in enumerate(boxes_c):
+    return_retina_net_objects_info = {}
+
+    for j, box in enumerate(boxes_c):
         obj_info = {
-            "class": COCO_INSTANCE_CATEGORY_NAMES[labels_c[i]],
+            "class": COCO_INSTANCE_CATEGORY_NAMES[labels_c[j]],
             "box": box.tolist()
         }
-        maskrcnn_objects_info[str(i)] = obj_info
+        return_retina_net_objects_info[str(j)] = obj_info
 
     # Visualize
     plt.figure(figsize=(10.24, 10.24))  # Set figure size directly
 
     plt.imshow(img)
 
-    ax = plt.gca()
-    for box, label, mask in zip(boxes, labels, masks):
+    retina_net_objects_info = list(zip(boxes, labels, scores))
+    for box, label, score in retina_net_objects_info:
         x1, y1, x2, y2 = box
         # Scale bounding box coordinates to match the resized image
         x1_scaled = x1 * 1024 / img.width
@@ -93,27 +95,21 @@ def run_maskrcnn(image_path, save_path, threshold=0.5):
         y1_scaled = y1 * 1024 / img.height
         y2_scaled = y2 * 1024 / img.height
 
-        category = COCO_INSTANCE_CATEGORY_NAMES[label.item()]
-        ax.add_patch(plt.Rectangle((x1_scaled, y1_scaled), x2_scaled - x1_scaled, y2_scaled - y1_scaled,
+        plt.gca().add_patch(plt.Rectangle((x1_scaled, y1_scaled), x2_scaled - x1_scaled, y2_scaled - y1_scaled,
                                    fill=False, edgecolor='red', linewidth=2))
-        plt.text(x1_scaled, y1_scaled, f'{category}', bbox=dict(facecolor='red', alpha=0.5),
+        category = COCO_INSTANCE_CATEGORY_NAMES[label.item()]
+        plt.text(x1_scaled, y1_scaled, f'{category} {score:.2f}', bbox=dict(facecolor='red', alpha=0.5),
                  fontsize=12, color='white')
-        mask = mask[0].mul(255).byte().cpu().numpy()
-        mask_resized = cv2.resize(mask, (img.width, img.height))
-        img_np = np.array(img)
-        img_np[mask_resized == 255] = (img_np[mask_resized == 255] * 0.5) + (np.array([255, 0, 0]) * 0.5)
 
     plt.axis('off')
-
-    # Remove white frame
-    plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
     # Save figure with appropriate size
     plt.savefig(save_path, dpi=100, bbox_inches='tight', pad_inches=0)
 
     plt.close()  # Close the figure to release resources
 
-    return maskrcnn_objects_info
+    return return_retina_net_objects_info
+
 
 
 # add {i}.png
@@ -124,9 +120,9 @@ filenames = [
     "presentation/photo_sdxl/reimagine/photo_reimagine_image",
     "presentation/sdxl/canny_conditioning/canny_conditioning_image",
     "presentation/photo_sdxl/canny_conditioning/canny_conditioning_image",
-    "presentation/semantic_sd15/upscaled/upscaled_semantic_sd15_image"
+    "presentation/semantic_sd15/upscaled/upscaled_semantic_sd15_image",
+    "presentation/semantic_sd15/control_net/cnet_generated_image"
            ]
-
 
 for file in filenames:
     # Find the index of the last occurrence of '/'
@@ -135,23 +131,24 @@ for file in filenames:
     # If '/' is found, remove everything after it (including '/')
     if last_slash_index != -1:
         directory_path = file[:last_slash_index]
-        maskrcnn_path = f"{directory_path}/maskrcnn"
-        create_directory(maskrcnn_path)
+        retina_path = f"{directory_path}/retina"
+        create_directory(retina_path)
     else:
         # Dump in temp
         print("wrong paths provided")
         create_directory("presentation/temp")
-        maskrcnn_path = "presentation/temp"
-        directory_path = maskrcnn_path
+        retina_path = "presentation/temp"
+        directory_path = retina_path
 
     for i in range(9):
         if "cnet_generated_image" in file:
             for cond in ["Boy", "Girl", "Man", "Women"]:
                 filename = f"{file}_{i}_{cond}.png"
-                save_path = f"{maskrcnn_path}/maskrcnn_image_{i}_{cond}.png"
-                # Run Mask R-CNN
-                objects_info = run_maskrcnn(filename, save_path, threshold=0.5)
-                print("maskrcnn_objects_info")
+                save_path = f"{retina_path}/retina_image_{i}_{cond}.png"
+                print("processing: ", filename)
+                # Run RetinaNet
+                objects_info = run_retina_net(filename, save_path, threshold=0.5)
+                print("retina_objects_info")
                 print(objects_info)
                 # Load depth map image into numpy array.
                 depth_map_image_path = f"{directory_path}/depth_map/depth_image_{i}_{cond}.png"
@@ -208,18 +205,18 @@ for file in filenames:
                 print(object_coordinates_3d)
 
                 # Save the object coordinates in 3D space as a JSON file
-                json_file_path = f"{maskrcnn_path}/object_coordinates_3d_{i}_{cond}.json"
+                json_file_path = f"{retina_path}/object_coordinates_3d_{i}_{cond}.json"
                 with open(json_file_path, "w") as json_file:
                     json.dump(object_coordinates_3d, json_file, indent=4)
 
                 print(f"Processed results for set {i}_{cond} in {directory_path}")
-
         else:
             filename = f"{file}_{i}.png"
-            save_path = f"{maskrcnn_path}/maskrcnn_image_{i}.png"
-            # Run Mask R-CNN
-            objects_info = run_maskrcnn(filename, save_path, threshold=0.5)
-            print("maskrcnn_objects_info")
+            save_path = f"{retina_path}/retina_image_{i}.png"
+            print("processing: ", filename)
+            # Run RetinaNet
+            objects_info = run_retina_net(filename, save_path, threshold=0.5)
+            print("retina_objects_info")
             print(objects_info)
             # Load depth map image into numpy array.
             depth_map_image_path = f"{directory_path}/depth_map/depth_image_{i}.png"
@@ -277,7 +274,7 @@ for file in filenames:
             print(object_coordinates_3d)
 
             # Save the object coordinates in 3D space as a JSON file
-            json_file_path = f"{maskrcnn_path}/object_coordinates_3d_{i}.json"
+            json_file_path = f"{retina_path}/object_coordinates_3d_{i}.json"
             with open(json_file_path, "w") as json_file:
                 json.dump(object_coordinates_3d, json_file, indent=4)
 
